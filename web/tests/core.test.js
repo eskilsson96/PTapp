@@ -62,3 +62,45 @@ test('user-supplied display text is escaped', () => {
 test('day keys use the local calendar', () => {
   assert.equal(todayKey(new Date(2026, 0, 2, 23, 59)), '2026-01-02');
 });
+
+import { defaultGoal, createRunningPlan, vdot, paceZones, validateRecovery, readiness } from '../src/running-coach.js';
+import { loadState } from '../src/storage.js';
+import { emptyState } from '../src/core.js';
+test('running coach uses benchmark VDOT, not target time, and includes recovery/taper', () => {
+  assert.ok(Math.abs(vdot(5000, 1200) - 49.8) < .2);
+  const a = createRunningPlan(defaultGoal());
+  const b = createRunningPlan({ ...defaultGoal(), targetMinutes: 20 });
+  assert.equal(a.vdot, b.vdot); assert.deepEqual(a.weeks, b.weeks);
+  assert.equal(a.weeks[3].phase, 'Recovery'); assert.equal(a.weeks.at(-1).phase, 'Taper');
+  assert.ok(paceZones(a.vdot)[0].fast > paceZones(a.vdot)[3].fast);
+});
+test('running coach rejects invalid dates and insufficient marathon base', () => {
+  for (const change of [{ weeks: 2 }, { targetMinutes: NaN }, { benchmarkDate: '2099-01-01' }, { raceDistance: 42195, targetMinutes: 240 }]) assert.throws(() => createRunningPlan({ ...defaultGoal(), ...change }));
+  assert.equal(createRunningPlan({ ...defaultGoal(), raceDistance: 42195, targetMinutes: 240, days: 4, weeks: 20, weeklyKm: 30 }).weeks.length, 20);
+});
+test('readiness needs seven distinct prior days of same-source data', () => {
+  const now = new Date(2026, 10, 3, 12);
+  const entry = { day: '2026-11-03', hrv: 30, sleep: 5, source: 'Watch', metric: 'SDNN' };
+  assert.equal(readiness([entry], now), null);
+  const baseline = Array.from({length: 7}, (_,i) => ({ ...entry, day: todayKey(new Date(2026, 10, 2-i)), hrv: 50 }));
+  assert.ok(readiness([entry, ...baseline], now).multiplier < 1);
+  assert.equal(readiness([entry, ...baseline.map(e => ({...e, source: 'Other'}))], now), null);
+  assert.equal(readiness([entry, ...Array(7).fill(baseline[0])], now), null);
+});
+test('manual recovery validates missing, impossible and future measurements', () => {
+  const now = new Date(2026,10,3);
+  const input = { day: '2026-11-03', hrv: 50, sleep: 8, source: 'Watch' };
+  assert.equal(validateRecovery(input, now).manual, true);
+  for (const change of [{ sleep: 0 }, { hrv: '' }, { source: '' }, { day: '2026-11-04' }]) assert.throws(() => validateRecovery({...input,...change},now));
+});
+test('storage upgrade preserves old profiles, meal logs and history', () => {
+  const old = emptyState(); delete old.runningPlans; delete old.healthMetrics;
+  old.profile = { name: 'Existing user' }; old.logs['2026-11-02'] = {workout: true}; old.sessions = [{id:'prior'}];
+  const previous = globalThis.localStorage;
+  try {
+    globalThis.localStorage = { getItem: () => JSON.stringify(old) };
+    const upgraded = loadState();
+    assert.deepEqual(upgraded.runningPlans, []); assert.deepEqual(upgraded.healthMetrics, []);
+    assert.deepEqual(upgraded.profile, old.profile); assert.deepEqual(upgraded.logs, old.logs); assert.deepEqual(upgraded.sessions, old.sessions);
+  } finally { globalThis.localStorage = previous; }
+});

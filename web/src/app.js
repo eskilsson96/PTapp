@@ -4,6 +4,8 @@ import { emptyState, todayKey, uid, dayLog, currency, costIn, duration, pace, es
 import { loadState, saveState, putTrack, getTrack } from './storage.js';
 import { showMap, disposeMap, locate, generateRoute, discover, updateRunner } from './maps.js';
 import { Tracker } from './tracker.js';
+import { defaultGoal, createRunningPlan, validateRecovery } from './running-coach.js';
+import { coachCard, planPreview, wizard, wearableView } from './coach-ui.js';
 
 const icons = { ArrowUpRight, ArrowLeft, ArrowRight, Plus, Check, X, ChevronRight, ChevronDown, Dumbbell, Flame, Leaf, Map: MapIcon, Crown, LayoutGrid, User, Settings, LocateFixed, Navigation, Play, Square, Timer, CheckCircle2, Circle, ShoppingBasket, Heart, Activity, Share, Download, WifiOff, Footprints, Bike, Flag, RefreshCw, Calendar, ShieldCheck, MoveUpRight, Focus, SlidersHorizontal, Utensils, Compass, Info };
 const $ = selector => document.querySelector(selector);
@@ -21,12 +23,14 @@ const defaults = () => ({ name: '', age: 25, sex: 'Prefer not to say', weight: 7
 let draft = defaults();
 const tracker = new Tracker(updateWorkout, cue);
 let pendingSession = null;
+let coachStep = 0, coachDraft = defaultGoal();
 const selectedRoute = () => state.routes.find(route => route.id === routeId);
 const currentLog = () => state.logs[todayKey()] ?? { workout: false, exercises: [], meals: {} };
 const totalWorkouts = () => Object.values(state.logs).filter(log => log.workout).length;
 
 function hydrate() { createIcons({ icons, attrs: { 'stroke-width': 1.8 } }); }
 function toast(message) {
+  if ($('#modal').open && $('#dialog-status')) { $('#dialog-status').textContent = message; $('#dialog-status').hidden = false; }
   $('#toast').textContent = message; $('#toast').classList.add('visible');
   clearTimeout(toastTimer); toastTimer = setTimeout(() => $('#toast').classList.remove('visible'), 4500);
 }
@@ -42,7 +46,7 @@ function cue(message) {
 }
 function openModal(html, label = 'FitCraft') {
   const modal = $('#modal');
-  modal.innerHTML = `<div class="modal-head"><span class="eyebrow">${e(label)}</span><button class="icon-button" data-action="close-modal" aria-label="Close dialog">${icon('x')}</button></div>${html}`;
+  modal.innerHTML = `<div class="modal-head"><span class="eyebrow">${e(label)}</span><button class="icon-button" data-action="close-modal" aria-label="Close dialog">${icon('x')}</button></div><p id="dialog-status" class="notice" role="status" hidden></p>${html}`;
   if (!modal.open) modal.showModal();
   hydrate();
 }
@@ -108,7 +112,7 @@ function dashboard() {
 
 function training() {
   const p = state.profile, plan = workouts(p, totalWorkouts()), log = currentLog();
-  return `<div class="page-heading"><span class="eyebrow lime">SHOW UP FOR YOURSELF</span><h1>Built around you<span class="lime">.</span></h1><p>Full body. Fresh energy. One session at a time.</p></div><div class="session-banner"><div class="session-icon">${icon('dumbbell')}</div><div><span class="eyebrow">${p.gym ? 'YOUR GYM SESSION' : 'YOUR HOME SESSION'}</span><h2>Strong foundations</h2><p>~35 min <span>•</span> ${e(p.level)} <span>•</span> ${plan.length} movements</p></div></div><div class="progress-heading"><span>${log.workout ? 'Session complete. Well done.' : `${log.exercises.length} of ${plan.length} movements complete`}</span><b>${Math.round((log.workout ? 1 : log.exercises.length / plan.length) * 100)}%</b></div><progress value="${log.workout ? plan.length : log.exercises.length}" max="${plan.length}"></progress>
+  return `<div class="page-heading"><span class="eyebrow lime">SHOW UP FOR YOURSELF</span><h1>Built around you<span class="lime">.</span></h1><p>Full body. Fresh energy. One session at a time.</p></div>${coachCard(state)}<div class="session-banner"><div class="session-icon">${icon('dumbbell')}</div><div><span class="eyebrow">${p.gym ? 'YOUR GYM SESSION' : 'YOUR HOME SESSION'}</span><h2>Strong foundations</h2><p>~35 min <span>•</span> ${e(p.level)} <span>•</span> ${plan.length} movements</p></div></div><div class="progress-heading"><span>${log.workout ? 'Session complete. Well done.' : `${log.exercises.length} of ${plan.length} movements complete`}</span><b>${Math.round((log.workout ? 1 : log.exercises.length / plan.length) * 100)}%</b></div><progress value="${log.workout ? plan.length : log.exercises.length}" max="${plan.length}"></progress>
     ${p.injuries ? `<div class="notice">${icon('heart')}<div><b>Your movement notes</b><p>${e(p.injuries)}</p><p>This general plan hasn’t been adapted to an injury. Get guidance on substitutions.</p></div></div>` : ''}
     <div class="exercise-list">${plan.map((exercise, index) => `<article class="card exercise ${log.exercises.includes(exercise.id) || log.workout ? 'complete' : ''}"><div class="exercise-top"><span class="exercise-number">0${index + 1}</span><div class="exercise-title"><span class="eyebrow">${exercise.type}</span><h3>${exercise.name}</h3><p>${exercise.sets} sets <span>×</span> ${exercise.reps}</p></div><button class="check-button" data-action="exercise" data-id="${exercise.id}" aria-label="${log.exercises.includes(exercise.id) ? 'Uncheck' : 'Complete'} ${exercise.name}" aria-pressed="${log.exercises.includes(exercise.id) || log.workout}" ${log.workout ? 'disabled' : ''}>${icon(log.exercises.includes(exercise.id) || log.workout ? 'check-circle-2' : 'circle')}</button></div><details><summary>Movement notes ${icon('chevron-down')}</summary><p>${exercise.note}</p></details></article>`).join('')}</div>
     <div class="rest-card"><div>${icon('timer')}<span id="rest-label">${restUntil > Date.now() ? `Rest · ${duration((restUntil - Date.now()) / 1000)}` : 'Breathe between sets.'}</span></div><button class="text-button" data-action="rest">60-sec rest ${icon('plus')}</button></div>
@@ -167,7 +171,7 @@ function shopping() {
 }
 function settings() {
   const p = state.profile;
-  openModal(`<h2>Your life. Your plan.</h2><form id="settings-form"><details open><summary>About you ${icon('chevron-down')}</summary>${profileFields(p, 0)}</details><details><summary>Training & equipment ${icon('chevron-down')}</summary>${profileFields(p, 1)}</details><details><summary>Food & targets ${icon('chevron-down')}</summary>${profileFields(p, 2)}</details><button class="primary" type="submit">Save my profile ${icon('check')}</button></form><div class="settings-links"><button data-action="install">${icon('download')}Add to Home Screen${icon('chevron-right')}</button><button data-action="export">${icon('share')}Export my data${icon('chevron-right')}</button><button data-action="privacy">${icon('shield-check')}Your data & this app${icon('chevron-right')}</button></div>`, 'YOUR FITCRAFT');
+  openModal(`<h2>Your life. Your plan.</h2><form id="settings-form"><details open><summary>About you ${icon('chevron-down')}</summary>${profileFields(p, 0)}</details><details><summary>Training & equipment ${icon('chevron-down')}</summary>${profileFields(p, 1)}</details><details><summary>Food & targets ${icon('chevron-down')}</summary>${profileFields(p, 2)}</details><button class="primary" type="submit">Save my profile ${icon('check')}</button></form><div class="settings-links"><button data-action="coach-start">Running coach</button><button data-action="wearables">Wearables & readiness</button><button data-action="install">${icon('download')}Add to Home Screen${icon('chevron-right')}</button><button data-action="export">${icon('share')}Export my data${icon('chevron-right')}</button><button data-action="privacy">${icon('shield-check')}Your data & this app${icon('chevron-right')}</button></div>`, 'YOUR FITCRAFT');
 }
 function install() {
   openModal(`<div class="install-icon">${icon('download')}</div><h2>A little closer, every day.</h2><p>Give FitCraft a place on your iPhone’s Home Screen.</p><ol class="install-steps"><li><b>1</b><span>Open this page in <strong>Safari</strong>.</span></li><li><b>2</b><span>Tap the <strong>Share</strong> button ${icon('share')} in Safari’s toolbar.</span></li><li><b>3</b><span>Choose <strong>Add to Home Screen</strong>, then tap <strong>Add</strong>.</span></li></ol><p class="hint">After the first visit, your plans and saved activity are available offline. Map tiles and route searches need internet. Safari’s menus may vary with iOS version.</p>${deferredInstall ? primary('Install FitCraft', 'browser-install', 'download') : ''}`, 'MAKE IT YOURS');
@@ -185,6 +189,10 @@ document.addEventListener('click', async event => {
       case 'onboard-back': draft = mergeForm($('#onboarding-form'), draft, onboardingStep); onboardingStep--; render(); break;
       case 'close-modal': closeModal(); break;
       case 'settings': settings(); break;
+      case 'coach-start': coachDraft = { ...defaultGoal(), ...(state.runningPlans?.find(p => p.active)?.goal ?? {}) }; coachStep = 0; coachWizard(); break;
+      case 'coach-back': coachDraft = { ...coachDraft, ...Object.fromEntries(new FormData($('#coach-form'))) }; coachStep--; coachWizard(); break;
+      case 'coach-view': { const plan = state.runningPlans?.find(p => p.active); if (plan) openModal(`<h2>Your running roadmap.</h2>${planPreview(plan)}${primary('Set a new goal', 'coach-start', 'flag')}`, 'RUNNING COACH'); break; }
+      case 'wearables': wearables(); break;
       case 'install': install(); break;
       case 'browser-install': await deferredInstall?.prompt(); deferredInstall = null; closeModal(); break;
       case 'exercise': transact(() => { const log = dayLog(state); if (!log.workout) log.exercises = log.exercises.includes(id) ? log.exercises.filter(key => key !== id) : [...log.exercises, id]; }); render(); break;
@@ -243,10 +251,24 @@ document.addEventListener('click', async event => {
 
 document.addEventListener('submit', async event => {
   const form = event.target;
-  if (!['onboarding-form', 'settings-form', 'route-form', 'segment-form'].includes(form.id)) return;
+  if (!['onboarding-form', 'settings-form', 'route-form', 'segment-form', 'coach-form', 'recovery-form'].includes(form.id)) return;
   event.preventDefault();
   try {
-    if (form.id === 'onboarding-form') {
+    if (form.id === 'coach-form') {
+      coachDraft = { ...coachDraft, ...Object.fromEntries(new FormData(form)) };
+      if (coachStep < 2) {
+        if (coachStep === 1) createRunningPlan(coachDraft);
+        coachStep++; coachWizard();
+      } else {
+        const plan = createRunningPlan(coachDraft);
+        transact(() => { state.runningPlans ??= []; state.runningPlans.forEach(p => { p.active = false; }); state.runningPlans.push(plan); });
+        closeModal(); tab = 'train'; render(); toast('Your running plan is saved.');
+      }
+    } else if (form.id === 'recovery-form') {
+      const entry = validateRecovery(Object.fromEntries(new FormData(form)));
+      transact(() => { state.healthMetrics = (state.healthMetrics ?? []).filter(item => item.day !== entry.day); state.healthMetrics.push(entry); });
+      render(); wearables(); toast('Manual recovery check-in saved.');
+    } else if (form.id === 'onboarding-form') {
       draft = mergeForm(form, draft, onboardingStep);
       if (onboardingStep < 2) { onboardingStep++; render(); window.scrollTo(0, 0); }
       else { const profile = validateProfile(draft); transact(() => { state.profile = { ...profile, demo: false }; }); render(); window.scrollTo(0, 0); }
@@ -322,3 +344,6 @@ setInterval(() => {
 }, 1000);
 if ('serviceWorker' in navigator && import.meta.env.PROD) window.addEventListener('load', () => navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => toast('Offline setup was unavailable. Reopen FitCraft online to retry.')));
 render();
+
+function coachWizard() { openModal(wizard(coachStep, coachDraft), 'RUNNING COACH'); }
+function wearables() { openModal(wearableView(state.healthMetrics ?? []), 'WEARABLES & RECOVERY'); }

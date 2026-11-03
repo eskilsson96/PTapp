@@ -5,6 +5,10 @@ export function loadState() {
   if (!raw) return emptyState();
   const saved = JSON.parse(raw);
   if (saved.version !== 1 || !saved.logs || !Array.isArray(saved.sessions) || !Array.isArray(saved.routes) || !Array.isArray(saved.attempts) || !Array.isArray(saved.segments) || !Array.isArray(saved.shopping)) throw new Error('The saved data could not be read. Your existing storage has not been overwritten.');
+  // Additive upgrade: preserve all existing profiles, routes, meals and sessions.
+  saved.runningPlans ??= [];
+  saved.healthMetrics ??= [];
+  if (!Array.isArray(saved.runningPlans) || !Array.isArray(saved.healthMetrics)) throw new Error('Running data could not be read. Existing storage was preserved.');
   return saved;
 }
 export function saveState(state) {

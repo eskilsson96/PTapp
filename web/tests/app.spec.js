@@ -139,3 +139,44 @@ test('Home Screen instructions and edited profile are usable on mobile', async (
   await page.getByRole('button', { name: 'Save my profile' }).click();
   await expect(page.getByRole('heading', { name: /Let’s go, <Sam>/ })).toBeVisible();
 });
+
+test('race wizard saves pace zones and plan across reload', async ({ page }) => {
+  await demo(page); await navigate(page, 'Train');
+  await page.getByRole('button', { name: 'Set a race goal', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByLabel('Actual finish time · minutes').fill('25');
+  await page.getByRole('dialog').getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByRole('dialog').getByText('Easy / recovery', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Save running plan', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '5K · 12-week plan' })).toBeVisible();
+  await page.reload(); await navigate(page, 'Train');
+  await page.getByRole('button', { name: 'View running plan', exact: true }).click();
+  await expect(page.getByRole('dialog').getByText('Week 12', { exact: true })).toBeVisible();
+});
+
+test('race wizard rejects insufficient marathon base without losing existing data', async ({ page }) => {
+  await demo(page); await navigate(page, 'Train');
+  await page.getByRole('button', { name: 'Set a race goal', exact: true }).click();
+  await page.getByLabel('Race distance').selectOption('42195');
+  await page.getByLabel('Target finish time · minutes').fill('240');
+  await page.getByRole('dialog').getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.locator('#dialog-status')).toContainText('marathon template needs');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('fitcraft.web.v1')).runningPlans)).toEqual([]);
+});
+
+test('recovery setup explains wearable limits and saves a manual measurement once per day', async ({ page }) => {
+  await demo(page); await navigate(page, 'Train');
+  await page.getByRole('button', { name: 'Recovery', exact: true }).click();
+  await expect(page.getByRole('dialog').getByText(/Safari cannot access Apple Health/)).toBeVisible();
+  await page.getByLabel('HRV · SDNN milliseconds').fill('50');
+  await page.getByLabel('Sleep · hours').fill('8');
+  await page.getByLabel('Device / source name').fill('My Watch');
+  await page.getByRole('button', { name: 'Save check-in' }).click();
+  await expect(page.getByRole('heading', { name: 'Building your baseline' })).toBeVisible();
+  await page.getByLabel('HRV · SDNN milliseconds').fill('55');
+  await page.getByLabel('Sleep · hours').fill('7');
+  await page.getByRole('button', { name: 'Save check-in' }).click();
+  const data = await page.evaluate(() => JSON.parse(localStorage.getItem('fitcraft.web.v1')).healthMetrics);
+  expect(data).toHaveLength(1); expect(data[0].hrv).toBe(55); expect(data[0].manual).toBe(true);
+});

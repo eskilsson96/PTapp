@@ -26,6 +26,14 @@ For a production build, run `npm run build`. Publish the **contents of `web/dist
 
 Workout templates are general suggestions, not injury rehabilitation. Meal costs and macros are estimates; live store discounts are not included. No login, shared global leaderboard, remote notifications or backend is connected. Personal segment attempts are not competition-verified.
 
+## Running coach and recovery update
+
+Open **Train → Set a race goal** for 5K/10K/half/marathon goals, a recent benchmark, approximate VDOT pace ranges and an 8–24-week volume template with recovery weeks/taper. Goal finish time is deliberately separate from training pace. These are deterministic starting templates; an AI service and automatic weekly adaptation are not implemented.
+
+Open **Train → Recovery** or Profile → Wearables & readiness to enter measured SDNN HRV and sleep manually. Readiness requires today's entry plus at least seven distinct prior days from the same source in 28 days. Do not mix SDNN with Garmin RMSSD readings. Missing data remains unscored; recommendations do not automatically change saved plans. Safari cannot access HealthKit or sync Apple Watch, and Garmin is not connected. No guided VO2 interval timers or live retailer integrations were added in this update.
+
+The storage upgrade adds `runningPlans` and `healthMetrics` without replacing old profiles, meal logs, routes or sessions. Regression tests verify preservation and new plan/check-in persistence.
+
 ## iPhone behavior
 
 After the site is published, open its **HTTPS URL in Safari**, tap Share → Add to Home Screen → Add. Open FitCraft from that icon. Menu wording can differ between iOS versions. Offline availability starts after the first successful online load and service-worker installation.
@@ -50,7 +58,7 @@ npm run build
 CHROMIUM_PATH=/path/to/chromium npm run test:e2e
 ```
 
-`npm test` runs 12 unit tests. The browser suite runs 10 end-to-end tests at an iPhone 13 viewport, covering onboarding, all tabs, workout completion, meal logging, shopping persistence, segment creation, successful/failed routing, GPS recording, offline relaunch and Home Screen/profile controls. GPS, routing and map tiles are controlled browser fixtures in these tests; they do not verify live provider availability or real outdoor GPS accuracy. Tests use Chromium, not actual iOS Safari.
+`npm test` runs 17 unit tests. The browser suite runs 13 end-to-end tests at an iPhone 13 viewport, covering onboarding, all tabs, workout completion, meal logging, shopping persistence, segment creation, successful/failed routing, GPS recording, offline relaunch and Home Screen/profile controls. GPS, routing and map tiles are controlled browser fixtures in these tests; they do not verify live provider availability or real outdoor GPS accuracy. Tests use Chromium, not actual iOS Safari.
 
 ## Hosting and publication
 
