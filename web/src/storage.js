@@ -8,6 +8,9 @@ export function loadState() {
   // Additive upgrade: preserve all existing profiles, routes, meals and sessions.
   saved.runningPlans ??= [];
   saved.healthMetrics ??= [];
+  saved.pantry ??= {};
+  saved.extraShopping ??= [];
+  if (typeof saved.pantry !== 'object' || Array.isArray(saved.pantry) || !Array.isArray(saved.extraShopping)) throw new Error('Pantry data could not be read. Existing storage was preserved.');
   if (!Array.isArray(saved.runningPlans) || !Array.isArray(saved.healthMetrics)) throw new Error('Running data could not be read. Existing storage was preserved.');
   return saved;
 }

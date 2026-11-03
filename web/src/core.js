@@ -1,5 +1,5 @@
 export const equipmentNames = { dumbbells: 'Dumbbells', bands: 'Resistance bands', kettlebell: 'Kettlebell', bench: 'Bench', pullup: 'Pull-up bar' };
-export const emptyState = () => ({ version: 1, profile: null, logs: {}, shopping: [], routes: [], segments: [], attempts: [], sessions: [], runningPlans: [], healthMetrics: [] });
+export const emptyState = () => ({ version: 1, profile: null, logs: {}, shopping: [], routes: [], segments: [], attempts: [], sessions: [], runningPlans: [], healthMetrics: [], pantry: {}, extraShopping: [] });
 export const todayKey = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 export const uid = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 export const dayLog = (state, key = todayKey()) => state.logs[key] ??= { workout: false, exercises: [], meals: {} };

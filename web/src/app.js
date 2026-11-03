@@ -4,8 +4,9 @@ import { emptyState, todayKey, uid, dayLog, currency, costIn, duration, pace, es
 import { loadState, saveState, putTrack, getTrack } from './storage.js';
 import { showMap, disposeMap, locate, generateRoute, discover, updateRunner } from './maps.js';
 import { Tracker } from './tracker.js';
-import { defaultGoal, createRunningPlan, validateRecovery } from './running-coach.js';
-import { coachCard, planPreview, wizard, wearableView } from './coach-ui.js';
+import { openKitchen } from './kitchen-ui.js';
+import { defaultGoal, createRunningPlan, validateRecovery, adjustPlan, readiness } from './running-coach.js';
+import { coachCard, planPreview, wizard, wearableView, checkInView } from './coach-ui.js';
 
 const icons = { ArrowUpRight, ArrowLeft, ArrowRight, Plus, Check, X, ChevronRight, ChevronDown, Dumbbell, Flame, Leaf, Map: MapIcon, Crown, LayoutGrid, User, Settings, LocateFixed, Navigation, Play, Square, Timer, CheckCircle2, Circle, ShoppingBasket, Heart, Activity, Share, Download, WifiOff, Footprints, Bike, Flag, RefreshCw, Calendar, ShieldCheck, MoveUpRight, Focus, SlidersHorizontal, Utensils, Compass, Info };
 const $ = selector => document.querySelector(selector);
@@ -98,15 +99,11 @@ function mergeForm(form, previous, step) {
 function dashboard() {
   const p = state.profile, log = currentLog(), totals = macroTotals(log);
   const date = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
-  const weekly = Array.from({ length: 7 }, (_, i) => { const date = new Date(); date.setDate(date.getDate() - 6 + i); return { date, key: todayKey(date), meters: state.sessions.filter(s => todayKey(new Date(s.started)) === todayKey(date)).reduce((sum, s) => sum + s.distance, 0) }; });
-  const weeklyMeters = weekly.reduce((sum, day) => sum + day.meters, 0);
-  const max = Math.max(1000, ...weekly.map(day => day.meters));
-  return `<div class="greeting"><div><p class="eyebrow">${e(date)}</p><h1>Let’s go, ${e(p.name)}<span class="lime">.</span></h1><p>Your pace. Your progress. Your day.</p></div><span class="sunburst" aria-hidden="true">✳</span></div>
-    <div class="dashboard-grid"><section class="hero-card"><div class="hero-top">${chip(`${icon('flame')} YOUR DAILY EDGE`, 'dark')}<span>01 / TODAY</span></div><h2>Small steps.<br><em>Stronger you.</em></h2><p>${log.workout ? 'You showed up today. Take a breath and make room for recovery.' : 'A full-body session, built around your life. You bring the effort. We’ll bring the plan.'}</p><div class="hero-bottom"><button class="dark-button" data-action="tab-train">${log.workout ? 'View your workout' : 'Let’s get moving'}${icon('arrow-up-right')}</button><span>~35 MIN<br><b>${p.gym ? 'GYM SESSION' : 'HOME SESSION'}</b></span></div><div class="hero-lines" aria-hidden="true"></div></section>
-    <section class="fuel-section">${section('Fuel your day', 'tab-fuel', 'Meal plan')}<div class="card macro-card"><div class="macro-rings">${[['protein', 'Protein', 'lime'], ['carbs', 'Carbs', 'peach'], ['fat', 'Fat', 'lavender']].map(([key, title, color]) => `<div class="macro"><div class="ring ${color}" style="--progress:${Math.min(100, totals[key] / p[key] * 100)}" role="img" aria-label="${title}: ${Math.round(totals[key])} of ${p[key]} grams logged"><div><strong>${Math.max(0, Math.round(p[key] - totals[key]))}<small>g</small></strong><span>left</span></div></div><b>${title}</b><span>${Math.round(totals[key])} / ${p[key]} g</span></div>`).join('')}</div><div class="card-footer">${icon('utensils')}A little planning. A lot more energy.</div></div></section>
-    <section class="outside-section">${section('Find your outside', 'tab-explore', 'Explore')}<button class="adventure-card" data-action="tab-explore"><div class="contours" aria-hidden="true">${routeSketch(selectedRoute() ?? sampleRoute())}</div><div class="adventure-content">${chip(`${icon('compass')} FRESH AIR, FRESH START`)}<h3>Your next adventure<br>is closer than you think.</h3><span>Find a route. Make it yours. ${icon('arrow-up-right')}</span></div></button></section>
-    <section class="week-section">${section('The bigger picture')}<div class="card"><div class="stats-row">${metric(String(weekly.filter(day => state.logs[day.key]?.workout).length), 'workouts · 7 days')}${metric((weeklyMeters / 1000).toFixed(1), 'outdoor km · 7 days')}${metric(String(totalWorkouts()), 'workouts · all time')}</div><div class="bar-chart" role="img" aria-label="Daily outdoor distance over the last seven days">${weekly.map(day => `<div class="bar-column"><span class="bar-track"><span style="height:${day.meters ? Math.max(5, day.meters / max * 100) : 0}%"></span></span><small>${e(day.date.toLocaleDateString(undefined, { weekday: 'narrow' }))}</small></div>`).join('')}</div><p class="chart-caption">${weeklyMeters ? 'Every kilometer is a little more time for you.' : 'Your first outdoor workout starts your story.'}</p></div></section>
-    <div class="tip-card">${icon('shopping-basket')}<div><span class="eyebrow">SMART FUEL, SMALLER SPEND</span><h3>Big nutrition. Little budget.</h3><p>Lentils, frozen greens and seasonal produce go a long way.</p></div></div></div>
+  const active = state.runningPlans?.find(plan => plan.active);
+  return `<div class="greeting"><div><p class="eyebrow">${e(date)}</p><h1>Today, ${e(p.name)}<span class="lime">.</span></h1><p>A little movement. Good food. Your day.</p></div><span class="sunburst" aria-hidden="true">✳</span></div>
+    <div class="today-grid"><section class="hero-card"><div class="hero-top">${chip(`${icon('dumbbell')} TODAY’S WORKOUT`, 'dark')}</div><h2>${log.workout ? 'You showed up.' : 'One tap.<br><em>Let’s move.</em>'}</h2><p>${log.workout ? 'Make room for recovery and enjoy the rest of your day.' : `Your full-body session · 35–45 minutes · ${p.gym ? 'At the gym' : 'At home'}`}</p><div class="hero-bottom"><button class="dark-button" data-action="tab-train">${log.workout ? 'View workout' : 'Start workout'}${icon('play')}</button></div></section>
+    <section class="fuel-section">${section('Today’s nutrition', 'tab-fuel', 'Log meal')}<div class="card macro-card"><div class="macro-rings">${[['protein', 'Protein', 'lime'], ['carbs', 'Carbs', 'peach'], ['fat', 'Fat', 'lavender']].map(([key, title, color]) => `<div class="macro"><div class="ring ${color}" style="--progress:${Math.min(100, totals[key] / p[key] * 100)}" role="img" aria-label="${title}: ${Math.round(totals[key])} of ${p[key]} grams logged"><div><strong>${Math.max(0, Math.round(p[key] - totals[key]))}<small>g</small></strong><span>left</span></div></div><b>${title}</b></div>`).join('')}</div><div class="today-meals">${meals(p).map(meal => `<button data-action="tab-fuel"><span>${meal.emoji} ${e(meal.name)}</span>${icon(log.meals[meal.id] ? 'check-circle-2' : 'chevron-right')}</button>`).join('')}</div></div></section>
+    <section class="today-actions">${section('Make it easy')}<div class="quick-actions"><button class="card" data-action="kitchen">${icon('utensils')}<span><b>Snap fridge</b><small>Cook from what you have</small></span>${icon('arrow-up-right')}</button><button class="card" data-action="tab-explore">${icon('compass')}<span><b>Explore a local route</b><small>A reason to get outside</small></span>${icon('arrow-up-right')}</button><button class="card" data-action="${active ? 'coach-view' : 'coach-start'}">${icon('flag')}<span><b>${active ? 'Review endurance plan' : 'Set an endurance goal'}</b><small>Running, cycling & your next race</small></span>${icon('arrow-up-right')}</button></div></section></div>
     <button class="install-banner" data-action="install">${icon('download')}<span>Your daily companion.<b>Add FitCraft to your Home Screen</b></span>${icon('chevron-right')}</button>`;
 }
 
@@ -121,7 +118,7 @@ function training() {
 
 function nutrition() {
   const p = state.profile, plan = meals(p), log = currentLog(), estimate = costIn(plan.reduce((sum, meal) => sum + meal.cost, 0) * 7, p.currency);
-  return `<div class="page-heading"><span class="eyebrow lime">EAT WELL. FEEL GOOD.</span><h1>Fuel for real life<span class="lime">.</span></h1><p>Simple ingredients. More energy. Less overthinking.</p></div><div class="nutrition-summary card"><div class="stats-row">${metric(e(currency(estimate, p.currency)), 'weekly estimate')}${metric(`${plan.reduce((sum, meal) => sum + meal.protein, 0)}<small>g</small>`, 'daily protein')}</div><span class="budget-message ${estimate > p.budget ? 'warning' : ''}">${icon(estimate > p.budget ? 'info' : 'check-circle-2')}${estimate > p.budget ? `${e(currency(estimate - p.budget, p.currency))} above your budget. Compare prices or try vegetarian meals.` : `Within your ${e(currency(p.budget, p.currency))} weekly budget.`}</span></div><div class="section-heading"><h2>On your menu today</h2><span class="subtle">3 simple staples</span></div><div class="meal-list">${plan.map(meal => `<article class="card meal-card"><div class="meal-art ${meal.color}" aria-hidden="true"><span>${meal.emoji}</span><div class="meal-art-label">${meal.minutes} MIN</div></div><div class="meal-content"><span class="eyebrow">${meal.type}</span><h3>${meal.name}</h3><div class="meal-macros"><b>${meal.protein}g protein</b><span>~${meal.protein * 4 + meal.carbs * 4 + meal.fat * 9} kcal</span></div><div class="meal-actions"><button class="text-button" data-action="recipe" data-id="${meal.id}">Recipe ${icon('arrow-up-right')}</button><button class="pill-button ${log.meals[meal.id] ? 'logged' : ''}" data-action="meal" data-id="${meal.id}" aria-pressed="${Boolean(log.meals[meal.id])}">${icon(log.meals[meal.id] ? 'check' : 'plus')}${log.meals[meal.id] ? 'Logged' : 'Log meal'}</button></div></div></article>`).join('')}</div>${primary('Your weekly shopping list', 'shopping', 'shopping-basket')}<p class="fine-print">Estimates for 3 meals × 7 days; snacks, oil and seasonings are extra. Repeated staples keep planning simple. Prices aren’t live store quotes. Adjust portions to your goals and check allergen labels.</p>`;
+  return `<div class="page-heading"><span class="eyebrow lime">EAT WELL. FEEL GOOD.</span><h1>Fuel for real life<span class="lime">.</span></h1><p>Simple ingredients. More energy. Less overthinking.</p></div><button class="secondary full kitchen-entry" data-action="kitchen">Cook from your fridge</button><div class="nutrition-summary card"><div class="stats-row">${metric(e(currency(estimate, p.currency)), 'weekly estimate')}${metric(`${plan.reduce((sum, meal) => sum + meal.protein, 0)}<small>g</small>`, 'daily protein')}</div><span class="budget-message ${estimate > p.budget ? 'warning' : ''}">${icon(estimate > p.budget ? 'info' : 'check-circle-2')}${estimate > p.budget ? `${e(currency(estimate - p.budget, p.currency))} above your budget. Compare prices or try vegetarian meals.` : `Within your ${e(currency(p.budget, p.currency))} weekly budget.`}</span></div><div class="section-heading"><h2>On your menu today</h2><span class="subtle">3 simple staples</span></div><div class="meal-list">${plan.map(meal => `<article class="card meal-card"><div class="meal-art ${meal.color}" aria-hidden="true"><span>${meal.emoji}</span><div class="meal-art-label">${meal.minutes} MIN</div></div><div class="meal-content"><span class="eyebrow">${meal.type}</span><h3>${meal.name}</h3><div class="meal-macros"><b>${meal.protein}g protein</b><span>~${meal.protein * 4 + meal.carbs * 4 + meal.fat * 9} kcal</span></div><div class="meal-actions"><button class="text-button" data-action="recipe" data-id="${meal.id}">Recipe ${icon('arrow-up-right')}</button><button class="pill-button ${log.meals[meal.id] ? 'logged' : ''}" data-action="meal" data-id="${meal.id}" aria-pressed="${Boolean(log.meals[meal.id])}">${icon(log.meals[meal.id] ? 'check' : 'plus')}${log.meals[meal.id] ? 'Logged' : 'Log meal'}</button></div></div></article>`).join('')}</div>${primary('Your weekly shopping list', 'shopping', 'shopping-basket')}<p class="fine-print">Estimates for 3 meals × 7 days; snacks, oil and seasonings are extra. Repeated staples keep planning simple. Prices aren’t live store quotes. Adjust portions to your goals and check allergen labels.</p>`;
 }
 
 function routeSketch(route) {
@@ -167,7 +164,11 @@ function updateWorkout() {
 
 function shopping() {
   const list = shoppingList(meals(state.profile));
-  openModal(`<h2>One shop. A whole week.</h2><p class="subtle">Seven days of your current meal plan.</p><div class="shopping-list">${['Produce', 'Chilled', 'Pantry', 'Frozen'].map(aisle => `<h3 class="eyebrow">${aisle}</h3>${list.filter(item => item.aisle === aisle).map(item => `<label class="shopping-item ${state.shopping.includes(item.name) ? 'checked' : ''}"><input type="checkbox" data-shopping="${e(item.name)}" ${state.shopping.includes(item.name) ? 'checked' : ''}><span>${e(item.name)}</span><b>${item.quantity} ${item.unit}</b></label>`).join('')}`).join('')}</div><button class="secondary full" data-action="shopping-reset">Reset checkmarks</button>`, 'YOUR SHOPPING LIST');
+  for (const extra of state.extraShopping ?? []) {
+    const prior = list.find(item => item.name === extra.name && item.unit === extra.unit);
+    if (prior) prior.quantity += extra.quantity; else list.push({ ...extra });
+  }
+  openModal(`<h2>One shop. A whole week.</h2><p class="subtle">Seven days of your meal plan, plus ingredients added from your kitchen.</p><div class="shopping-list">${['Produce', 'Chilled', 'Pantry', 'Frozen'].map(aisle => `<h3 class="eyebrow">${aisle}</h3>${list.filter(item => item.aisle === aisle).map(item => `<label class="shopping-item ${state.shopping.includes(item.name) ? 'checked' : ''}"><input type="checkbox" data-shopping="${e(item.name)}" ${state.shopping.includes(item.name) ? 'checked' : ''}><span>${e(item.name)}</span><b>${item.quantity} ${item.unit}</b></label>`).join('')}`).join('')}</div><button class="secondary full" data-action="shopping-reset">Reset checkmarks</button>`, 'YOUR SHOPPING LIST');
 }
 function settings() {
   const p = state.profile;
@@ -191,7 +192,8 @@ document.addEventListener('click', async event => {
       case 'settings': settings(); break;
       case 'coach-start': coachDraft = { ...defaultGoal(), ...(state.runningPlans?.find(p => p.active)?.goal ?? {}) }; coachStep = 0; coachWizard(); break;
       case 'coach-back': coachDraft = { ...coachDraft, ...Object.fromEntries(new FormData($('#coach-form'))) }; coachStep--; coachWizard(); break;
-      case 'coach-view': { const plan = state.runningPlans?.find(p => p.active); if (plan) openModal(`<h2>Your running roadmap.</h2>${planPreview(plan)}${primary('Set a new goal', 'coach-start', 'flag')}`, 'RUNNING COACH'); break; }
+      case 'coach-view': { const plan = state.runningPlans?.find(p => p.active); if (plan) openModal(`<h2>Your endurance roadmap.</h2>${planPreview(plan)}${checkInView(plan)}${primary('Set a new goal', 'coach-start', 'flag')}`, 'RUNNING COACH'); break; }
+      case 'kitchen': openKitchen({ getState: () => state, transact, openModal, toast, refresh: render }); break;
       case 'wearables': wearables(); break;
       case 'install': install(); break;
       case 'browser-install': await deferredInstall?.prompt(); deferredInstall = null; closeModal(); break;
@@ -251,7 +253,7 @@ document.addEventListener('click', async event => {
 
 document.addEventListener('submit', async event => {
   const form = event.target;
-  if (!['onboarding-form', 'settings-form', 'route-form', 'segment-form', 'coach-form', 'recovery-form'].includes(form.id)) return;
+  if (!['onboarding-form', 'settings-form', 'route-form', 'segment-form', 'coach-form', 'recovery-form', 'plan-checkin-form'].includes(form.id)) return;
   event.preventDefault();
   try {
     if (form.id === 'coach-form') {
@@ -264,6 +266,13 @@ document.addEventListener('submit', async event => {
         transact(() => { state.runningPlans ??= []; state.runningPlans.forEach(p => { p.active = false; }); state.runningPlans.push(plan); });
         closeModal(); tab = 'train'; render(); toast('Your running plan is saved.');
       }
+    } else if (form.id === 'plan-checkin-form') {
+      const index = state.runningPlans.findIndex(plan => plan.active);
+      if (index < 0) throw new Error('Set a goal first.');
+      const plan = adjustPlan(state.runningPlans[index], new FormData(form).get('completedKm'), readiness(state.healthMetrics ?? []));
+      transact(() => { state.runningPlans[index] = plan; });
+      render(); openModal(`<h2>Your endurance roadmap.</h2>${planPreview(plan)}${checkInView(plan)}${primary('Set a new goal', 'coach-start', 'flag')}`, 'ENDURANCE COACH');
+      toast(plan.adjustments.at(-1).reason);
     } else if (form.id === 'recovery-form') {
       const entry = validateRecovery(Object.fromEntries(new FormData(form)));
       transact(() => { state.healthMetrics = (state.healthMetrics ?? []).filter(item => item.day !== entry.day); state.healthMetrics.push(entry); });
@@ -303,6 +312,19 @@ document.addEventListener('input', event => {
   if (event.target.id === 'target-distance') $('#distance-output').textContent = event.target.value;
 });
 document.addEventListener('change', event => {
+  if (event.target.name === 'racePreset' && event.target.value !== 'custom') {
+    const distance = Number(event.target.value);
+    $('#coach-form [name=raceDistance]').value = distance;
+    $('#coach-form [name=targetMinutes]').value = distance === 5000 ? 30 : distance === 10000 ? 60 : distance === 21097.5 ? 120 : 240;
+  }
+  if (event.target.name === 'sport') {
+    const cycling = event.target.value === 'cycling';
+    $('#coach-form [name=racePreset]').value = cycling ? 'custom' : '5000';
+    $('#coach-form [name=raceDistance]').value = cycling ? 50000 : 5000;
+    $('#coach-form [name=targetMinutes]').value = cycling ? 120 : 30;
+    coachDraft.benchmarkDistance = cycling ? 50000 : 5000;
+    coachDraft.benchmarkMinutes = cycling ? 120 : 30;
+  }
   if (event.target.dataset.shopping) {
     const name = event.target.dataset.shopping;
     try { transact(() => { state.shopping = event.target.checked ? [...new Set([...state.shopping, name])] : state.shopping.filter(s => s !== name); }); event.target.closest('label').classList.toggle('checked', event.target.checked); }

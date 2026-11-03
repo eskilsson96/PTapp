@@ -26,13 +26,21 @@ For a production build, run `npm run build`. Publish the **contents of `web/dist
 
 Workout templates are general suggestions, not injury rehabilitation. Meal costs and macros are estimates; live store discounts are not included. No login, shared global leaderboard, remote notifications or backend is connected. Personal segment attempts are not competition-verified.
 
-## Running coach and recovery update
+## Today, endurance coaching and smart kitchen update
 
-Open **Train → Set a race goal** for 5K/10K/half/marathon goals, a recent benchmark, approximate VDOT pace ranges and an 8–24-week volume template with recovery weeks/taper. Goal finish time is deliberately separate from training pace. These are deterministic starting templates; an AI service and automatic weekly adaptation are not implemented.
+Today now shows a one-tap workout entry, remaining macros, meal choices, and quick actions for the kitchen, routes and endurance goals.
 
-Open **Train → Recovery** or Profile → Wearables & readiness to enter measured SDNN HRV and sleep manually. Readiness requires today's entry plus at least seven distinct prior days from the same source in 28 days. Do not mix SDNN with Garmin RMSSD readings. Missing data remains unscored; recommendations do not automatically change saved plans. Safari cannot access HealthKit or sync Apple Watch, and Garmin is not connected. No guided VO2 interval timers or live retailer integrations were added in this update.
+Open **Today → Set an endurance goal** or **Train → Set a race goal** for running/cycling goals, standard race presets or a custom 5–200 km distance. Goal setup accepts 6–24 requested weeks, reviews the timeline and saves an 8–24-week recommendation. The 200 km limit is for goal entry, not a change to map route generation. Running estimates use benchmark VDOT and Riegel; cycling does not reuse those running formulas. Training details are collapsed by default. Warnings explain ambitious pace targets, short timelines and reference volume growth above 10%; these are planning heuristics, not validated individual injury predictions.
 
-The storage upgrade adds `runningPlans` and `healthMetrics` without replacing old profiles, meal logs, routes or sessions. Regression tests verify preservation and new plan/check-in persistence.
+An active plan offers a weekly check-in after seven days. Actual completed distance and today's available manual readiness can reduce future volume, extend the timeline up to two weeks, or shorten it one week above the minimum preparation period. Completed weeks and adjustment history are preserved. Duplicate check-ins are blocked; taper weeks cannot be changed. Zero completed distance pauses future load until a new baseline is set. No missed kilometers are made up.
+
+Open **Train → Recovery** to enter measured SDNN HRV and sleep manually. Readiness requires today's entry plus seven distinct earlier days from the same source within 28 days. Do not mix SDNN and Garmin RMSSD. Missing data remains unscored and cannot trigger timeline compression. Safari cannot access HealthKit or sync Apple Watch; Garmin is not connected. A recovery measurement alone does not change a saved plan.
+
+Open **Today → Snap fridge** or **Fuel → Cook from your fridge**. Take or select up to three photos, verify ingredients and amounts, then find recipes from a curated offline library. Every required ingredient must be present in enough grams; only cooking water is assumed. Optional missing spices are shown separately. Recipes have step-by-step preparation, timing, approximate macros, meal logging/undo, and missing-ingredient additions to the aisle shopping list. Results are ranked against remaining macros. Vegan/dairy-free filtering is supported; users must verify allergen labels. Pantry quantities are snapshots and are not decremented when logging meals.
+
+Photos are previewed locally, resized/re-encoded and discarded when the kitchen closes. They are never uploaded or saved in LocalStorage. **AI recognition is not connected**; ingredient confirmation is manual. This release does not add an AI backend, guided interval timers, live retailer feeds, global leaderboards, or new route-distance capabilities.
+
+The storage upgrade adds default-empty `pantry` and `extraShopping` alongside the previous `runningPlans` and `healthMetrics`, preserving existing profiles, logs, routes and sessions. Existing running plans remain unchanged until reviewed or replaced. JSON export includes verified pantry data and plan history but no photos.
 
 ## iPhone behavior
 
@@ -58,10 +66,10 @@ npm run build
 CHROMIUM_PATH=/path/to/chromium npm run test:e2e
 ```
 
-`npm test` runs 17 unit tests. The browser suite runs 13 end-to-end tests at an iPhone 13 viewport, covering onboarding, all tabs, workout completion, meal logging, shopping persistence, segment creation, successful/failed routing, GPS recording, offline relaunch and Home Screen/profile controls. GPS, routing and map tiles are controlled browser fixtures in these tests; they do not verify live provider availability or real outdoor GPS accuracy. Tests use Chromium, not actual iOS Safari.
+`npm test` runs 24 unit tests. The browser suite runs 18 end-to-end tests at an iPhone 13 viewport, covering onboarding, all tabs, workout completion, meal logging, shopping persistence, segment creation, successful/failed routing, GPS recording, offline relaunch and Home Screen/profile controls. GPS, routing and map tiles are controlled browser fixtures in these tests; they do not verify live provider availability or real outdoor GPS accuracy. Tests use Chromium, not actual iOS Safari.
 
 ## Hosting and publication
 
 `.github/workflows/web.yml` builds and tests on changes, then saves a Pages artifact. Pushes to `main` only build/test. **After explicit publication approval**, pushing to the dedicated `fitcraft-web-publish` branch builds, tests and publishes the app. A manual workflow run with `publish` checked does the same. This makes the website public. Publication produces the authoritative URL in the deployment result. Before the first deployment, the repository owner must open Settings → Pages → Build and deployment and select **GitHub Actions** as the source. The workflow's integration token cannot create the Pages site itself.
 
-Alternatively deploy `web/dist` to any authorized static HTTPS host. No hosting account, public deployment, or publicly reachable URL was established during implementation. The connected GitHub REST access check returned Forbidden; a saved workflow is not evidence that publishing will succeed. No source has been pushed from this task.
+The existing public site is **https://eskilsson96.github.io/PTapp/**. A successful GitHub Actions `publish` job is the deployment confirmation. The runtime may block direct requests to that Pages domain even when GitHub deployment succeeds. Refresh Safari online to fetch a newer release; do not clear website data to update.
