@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: web
@@ -38,7 +38,7 @@ jobs:
       - name: Run mobile browser tests
         run: |
           export CHROMIUM_PATH="$(node --input-type=module -e 'import { chromium } from "@playwright/test"; console.log(chromium.executablePath())')"
-          npm run test:e2e
+          npm run test:e2e -- --reporter=list,github
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -50,7 +50,7 @@ jobs:
   publish:
     if: (github.event_name == 'workflow_dispatch' && inputs.publish) || (github.event_name == 'push' && github.ref == 'refs/heads/fitcraft-web-publish')
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       pages: write
       id-token: write

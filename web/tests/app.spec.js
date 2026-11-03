@@ -103,10 +103,13 @@ test('outdoor recording saves GPS movement and an activity journal entry', async
   await page.getByRole('button', { name: 'Start an outdoor workout' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Walk', exact: true }).click();
   await expect(page.getByText('RECORDING', { exact: true })).toBeVisible();
+  await context.setGeolocation({ latitude: 59.3385, longitude: 18.026, accuracy: 5 });
+  await expect(page.locator('#live-accuracy')).toContainText('±5m');
   await page.waitForTimeout(1200);
   await context.setGeolocation({ latitude: 59.33855, longitude: 18.026, accuracy: 5 });
   await page.waitForTimeout(1200);
   await context.setGeolocation({ latitude: 59.33860, longitude: 18.026, accuracy: 5 });
+  await expect.poll(async () => Number(await page.locator('#live-distance').textContent())).toBeGreaterThan(0);
   await page.getByRole('button', { name: 'Finish workout' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Finish workout' }).click();
   await page.getByRole('button', { name: 'Save my workout' }).click();
