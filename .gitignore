@@ -1,0 +1,14 @@
+.DS_Store
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcresult
+*.ipa
+*.xcarchive
+__pycache__/
+*.zip
+node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
