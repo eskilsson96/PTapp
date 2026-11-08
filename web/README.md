@@ -73,3 +73,7 @@ CHROMIUM_PATH=/path/to/chromium npm run test:e2e
 `.github/workflows/web.yml` builds and tests on changes, then saves a Pages artifact. Pushes to `main` only build/test. **After explicit publication approval**, pushing to the dedicated `fitcraft-web-publish` branch builds, tests and publishes the app. A manual workflow run with `publish` checked does the same. This makes the website public. Publication produces the authoritative URL in the deployment result. Before the first deployment, the repository owner must open Settings → Pages → Build and deployment and select **GitHub Actions** as the source. The workflow's integration token cannot create the Pages site itself.
 
 The existing public site is **https://eskilsson96.github.io/PTapp/**. A successful GitHub Actions `publish` job is the deployment confirmation. The runtime may block direct requests to that Pages domain even when GitHub deployment succeeds. Refresh Safari online to fetch a newer release; do not clear website data to update.
+
+## Separate Runner test
+
+The running-focused test is available at `runner/` under the published site. It has its own profile/history and Home Screen manifest. See [Runner test details](runner/README.md) for controls, testing, and integration boundaries. The build now includes both app entries; the test command runs both logic suites and the browser suite covers both apps.
